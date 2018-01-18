@@ -15,43 +15,21 @@ from skimage import data
 from skimage import io
 from skimage import img_as_float
 from skimage import measure
-from skimage import feature
-from skimage import filters
 from skimage import draw
+from skimage import color
 
 import json
 
 from util import imgutil
 from util.imgutil import draw_data_points as ddp
 
+import segmentation
+
+import multiprocessing
 from multiprocessing import Pool
 from functools import partial
 
 io.use_plugin('matplotlib')
-
-
-def create_bin_img(image):
-    """Create binary image from image argument and return it.
-
-    Keyword arguments:
-    image -- grayscale image to turn into binary.
-    """
-
-    # Create binary image using ohsu thresholding.
-    val = filters.threshold_adaptive(image, 35)
-    result = image > val
-
-    # Check if background was brighter than foreground, if so, invert the binary image.
-    labels = measure.label(result, background=2)
-
-    # Assume that background area > foreground area
-    mx_region = max(measure.regionprops(labels), key=lambda r: r.area)
-
-    rr, cc = list(zip(*mx_region.coords))
-    if np.mean(result[rr, cc]) == 1:
-        result = np.invert(result)
-
-    return result
 
 
 def find_palm_point(image):
@@ -427,12 +405,18 @@ def identify_image(image_path, outdir):
     image = img_as_float(image)
     image = skimage.transform.resize(image, (300, 400, 3))
 
-    image = skimage.color.rgb2gray(image)
-
-    binary = create_bin_img(image)
+    binary = segmentation.create_bin_img_slic(image)
 
     plt.imshow(binary, cmap='gray')
-    plt.show()
+    # plt.show()
+
+    drawing, finger_data, palm_point = identify_binary_image(binary)
+    print("Sucessfully processed:", os.path.split(image_path)[1])
+
+    return drawing, finger_data, palm_point
+
+
+def identify_binary_image(binary):
 
     palm_point, inner_radius = find_palm_point(binary)
 
@@ -456,14 +440,16 @@ def identify_image(image_path, outdir):
 
     drawing = draw_finished_image(no_wrist_img, finger_data, palm_point)
 
-    print("Sucessfully processed:", os.path.split(image_path)[1])
     return drawing, finger_data, palm_point
 
 
 def identify_and_output(image_path, outdir):
-    image, finger_data, palm_point = identify_image(image_path, outdir)
-    write_data(finger_data, palm_point, os.path.splitext(os.path.split(image_path)[1])[0] + '_data.json', outdir)
-    io.imsave(os.path.join(outdir, os.path.splitext(os.path.split(image_path)[1])[0] + '_image.jpg'), image)
+    try:
+        image, finger_data, palm_point = identify_image(image_path, outdir)
+        write_data(finger_data, palm_point, os.path.splitext(os.path.split(image_path)[1])[0] + '_data.json', outdir)
+        io.imsave(os.path.join(outdir, os.path.splitext(os.path.split(image_path)[1])[0] + '_image.jpg'), image)
+    except Exception as e:
+        print("Unexpected error:", e)
 
 
 if __name__ == '__main__':
@@ -490,7 +476,7 @@ if __name__ == '__main__':
                 if os.path.isfile(os.path.join(path, f)):
                     files.append(os.path.join(path, f))
 
-            p = Pool()
+            p = Pool(processes=(multiprocessing.cpu_count() - 1))
             p.map(partial(identify_and_output, outdir=outdir), files)
             # for f in files:
             #    identify_and_output(f, outdir)

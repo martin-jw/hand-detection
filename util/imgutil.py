@@ -7,6 +7,7 @@ from skimage import color
 
 import math
 
+
 def resize_image(image, points, width, height):
     """Resize the given image and translate the given data points accordingly.
 
