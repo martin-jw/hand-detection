@@ -9,6 +9,7 @@ import os
 import sys
 import math
 import time
+import traceback
 
 import skimage
 from skimage import data
@@ -423,6 +424,9 @@ def identify_binary_image(binary):
     palm_mask = create_palm_mask(binary, palm_point, inner_radius, 5)
     wrist_points = find_wrist_points(palm_mask)
 
+    plt.imshow(ddp(ddp(binary, [0, 0, 1], 2, palm_point, *palm_mask), [1, 0, 1], 2, *wrist_points))
+    # plt.show()
+
     binary, palm_point, palm_mask, wrist_points = rotate_hand_upright(binary, palm_point, palm_mask, wrist_points)
     no_wrist_img = remove_wrist(binary, wrist_points)
 
@@ -449,7 +453,11 @@ def identify_and_output(image_path, outdir):
         write_data(finger_data, palm_point, os.path.splitext(os.path.split(image_path)[1])[0] + '_data.json', outdir)
         io.imsave(os.path.join(outdir, os.path.splitext(os.path.split(image_path)[1])[0] + '_image.jpg'), image)
     except Exception as e:
-        print("Unexpected error:", e)
+        print(image_path)
+        traceback.print_exc()
+        return False
+    else:
+        return True
 
 
 if __name__ == '__main__':
@@ -477,10 +485,11 @@ if __name__ == '__main__':
                     files.append(os.path.join(path, f))
 
             p = Pool(processes=(multiprocessing.cpu_count() - 1))
-            p.map(partial(identify_and_output, outdir=outdir), files)
+            res = p.map(partial(identify_and_output, outdir=outdir), files)
             # for f in files:
             #    identify_and_output(f, outdir)
 
-            print("All images processed!")
+            count = res.count(True)
+            print(count, "/", len(res), "images sucessfully processed!")
         else:
             print("Path specified is not a valid file or directory:", path)
