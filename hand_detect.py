@@ -39,13 +39,19 @@ def find_palm_point(image):
     Keyword arguments:
     image -- binary image.
     """
+    miny = 50
+    maxy = 250
+    minx = 75
+    maxx = 325
 
-    dist_map = mp.distance_transform_edt(image)
+    dist_map = mp.distance_transform_edt(image[50:250, 100: 300])
+    plt.imshow(dist_map, cmap='gray')
+    plt.show()
     max_index = np.argmax(dist_map)
 
     index = np.unravel_index(max_index, dist_map.shape)
 
-    return index, math.ceil(dist_map[index])
+    return [index[0] + miny, index[1] + minx], math.ceil(dist_map[index])
 
 
 def get_nearest_border(image, point):
@@ -390,9 +396,20 @@ def draw_finished_image(image, finger_data, palm_point):
         canvas[draw.circle(finger['start'][0], finger['start'][1], 3, shape=canvas.shape)] = c
         canvas[draw.circle(finger['tip'][0], finger['tip'][1], 3, shape=canvas.shape)] = [1, 0, 0]
 
-        canvas[draw.line(int(palm_point[0]), int(palm_point[1]), int(finger['start'][0]), int(finger['start'][1]))] = c
-        canvas[draw.line(int(finger['start'][0]), int(finger['start'][1]), int(finger['point'][0]), int(finger['point'][1]))] = c
-        canvas[draw.line(int(finger['point'][0]), int(finger['point'][1]), int(finger['tip'][0]), int(finger['tip'][1]))] = c
+        try:
+            canvas[draw.line(int(palm_point[0]), int(palm_point[1]), int(finger['start'][0]), int(finger['start'][1]))] = c
+        except IndexError:
+            print("Unable to draw line!")
+
+        try:
+            canvas[draw.line(int(finger['start'][0]), int(finger['start'][1]), int(finger['point'][0]), int(finger['point'][1]))] = c
+        except IndexError:
+            print("Unable to draw line!")
+
+        try:
+            canvas[draw.line(int(finger['point'][0]), int(finger['point'][1]), int(finger['tip'][0]), int(finger['tip'][1]))] = c
+        except IndexError:
+            print("Unable to draw line!")
 
     canvas[draw.circle(palm_point[0], palm_point[1], 5, shape=canvas.shape)] = [0, 0, 0]
     return canvas
