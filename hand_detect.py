@@ -33,6 +33,14 @@ from functools import partial
 io.use_plugin('matplotlib')
 
 
+def create_debug_fig(img, title, cmap=None):
+    fig = plt.figure()
+    plt.subplot(111)
+    plt.title(title)
+    plt.imshow(img, cmap=cmap)
+
+    return fig
+
 def find_palm_point(image):
     """Find the palm point in the given binary image using a distance map.
 
@@ -45,8 +53,10 @@ def find_palm_point(image):
     maxx = 325
 
     dist_map = mp.distance_transform_edt(image[50:250, 100: 300])
-    plt.imshow(dist_map, cmap='gray')
-    plt.show()
+
+    if __debug__:
+        create_debug_fig(dist_map, "Distance Map", cmap='gray')
+
     max_index = np.argmax(dist_map)
 
     index = np.unravel_index(max_index, dist_map.shape)
@@ -423,10 +433,13 @@ def identify_image(image_path, outdir):
     image = img_as_float(image)
     image = skimage.transform.resize(image, (300, 400, 3))
 
+    if __debug__:
+        create_debug_fig(image, "Original Image")
+
     binary = segmentation.create_bin_img_slic(image)
 
-    plt.imshow(binary, cmap='gray')
-    # plt.show()
+    if __debug__:
+        create_debug_fig(binary, "Binary Image", cmap='gray')
 
     drawing, finger_data, palm_point = identify_binary_image(binary)
     print("Sucessfully processed:", os.path.split(image_path)[1])
@@ -441,8 +454,8 @@ def identify_binary_image(binary):
     palm_mask = create_palm_mask(binary, palm_point, inner_radius, 5)
     wrist_points = find_wrist_points(palm_mask)
 
-    plt.imshow(ddp(ddp(binary, [0, 0, 1], 2, palm_point, *palm_mask), [1, 0, 1], 2, *wrist_points))
-    # plt.show()
+    if __debug__:
+        fig = create_debug_fig(ddp(ddp(binary, [0, 0, 1], 4, *palm_mask), [1, 0, 1], 4, *wrist_points), "Palm Mask", cmap='gray')
 
     binary, palm_point, palm_mask, wrist_points = rotate_hand_upright(binary, palm_point, palm_mask, wrist_points)
     no_wrist_img = remove_wrist(binary, wrist_points)
@@ -469,9 +482,13 @@ def identify_and_output(image_path, outdir):
         image, finger_data, palm_point = identify_image(image_path, outdir)
         write_data(finger_data, palm_point, os.path.splitext(os.path.split(image_path)[1])[0] + '_data.json', outdir)
         io.imsave(os.path.join(outdir, os.path.splitext(os.path.split(image_path)[1])[0] + '_image.jpg'), image)
+        if __debug__:
+            plt.show()
     except Exception as e:
         print(image_path)
         traceback.print_exc()
+        if __debug__:
+            plt.show()
         return False
     else:
         return True

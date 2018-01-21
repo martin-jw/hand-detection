@@ -22,20 +22,15 @@ def create_bin_img_slic(image):
     labels1 = segmentation.slic(image, n_segments=500)
     g = future.graph.rag_mean_color(image, labels1)
 
-    plt.subplot(121)
-    plt.imshow(color.label2rgb(labels1, image))
+    if __debug__:
+        fig = plt.figure()
+        plt.subplot(111)
+        plt.title("SLIC Seg.")
+        plt.imshow(color.label2rgb(labels1, image))
+
 
     labels2 = future.graph.cut_threshold(labels1, g, 0.060)
-    # labels2 = future.graph.ncut(labels1, g)
-
-    plt.subplot(122)
-    plt.imshow(color.label2rgb(labels2, image))
-
-    # plt.show()
-
-    edges = feature.canny(color.rgb2gray(image), sigma=1.5)
-    plt.imshow(edges, cmap='gray')
-    # plt.show()
+    labels2 = future.graph.ncut(labels1, g)
 
     bin_test = np.zeros((300, 400))
     for r in measure.regionprops(labels2):
