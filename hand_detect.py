@@ -440,7 +440,7 @@ def identify_image(image_path, outdir):
     if __debug__:
         create_debug_fig(image, "Original Image")
 
-    binary = segmentation.create_bin_img_threshold(image)
+    binary = segmentation.create_bin_img_slic(image)
 
     if __debug__:
         create_debug_fig(binary, "Binary Image", cmap='gray')
