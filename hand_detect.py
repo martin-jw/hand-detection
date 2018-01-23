@@ -10,6 +10,7 @@ import sys
 import math
 import time
 import traceback
+import re
 
 import skimage
 from skimage import data
@@ -18,12 +19,14 @@ from skimage import img_as_float
 from skimage import measure
 from skimage import draw
 from skimage import color
+from skimage import feature
 
 import json
 
 from util import imgutil
 from util.imgutil import draw_data_points as ddp
 
+from util import debugutil
 from util.debugutil import create_debug_fig
 
 import segmentation
@@ -46,12 +49,15 @@ def find_palm_point(image):
     maxx = 300
 
     dist_map = mp.distance_transform_edt(image[miny:maxy, minx:maxx])
+    maxima = feature.peak_local_max(dist_map)
 
     if __debug__:
         create_debug_fig(dist_map, "Distance Map", cmap='gray')
+        plt.plot(*reversed(list(zip(*maxima))), 'r+')
 
     max_index = np.argmax(dist_map)
     index = np.unravel_index(max_index, dist_map.shape)
+    print(index)
 
     return [index[0] + miny, index[1] + minx], math.ceil(dist_map[index])
 
@@ -467,7 +473,7 @@ def identify_binary_image(binary):
     no_wrist_img, palm_point, palm_mask, wrist_points = crop_and_resize_image(no_wrist_img, palm_point, palm_mask, wrist_points)
 
     if __debug__:
-        create_debug_fig(ddp(ddp(no_wrist_img, [0, 0, 1], 2, *palm_mask), [1, 0, 1], 2, *wrist_points, palm_point), "Rotated Image")
+        create_debug_fig(ddp(ddp(no_wrist_img, [0, 0, 1], 2, *palm_mask), [1, 0, 1], 2, palm_point, *wrist_points), "Rotated Image")
 
     no_palm_img = remove_palm(no_wrist_img, palm_mask)
     finger_data, has_thumb = find_fingers(no_palm_img, palm_point)
@@ -491,20 +497,21 @@ def identify_binary_image(binary):
 
 
 def identify_and_output(image_path, outdir):
+    p = re.compile("id(\d+)")
     try:
         image, finger_data, palm_point = identify_image(image_path, outdir)
         write_data(finger_data, palm_point, os.path.splitext(os.path.split(image_path)[1])[0] + '_data.json', outdir)
         io.imsave(os.path.join(outdir, os.path.splitext(os.path.split(image_path)[1])[0] + '_image.jpg'), image)
         if __debug__:
-            plt.show()
+            debugutil.show()
     except Exception as e:
         print(image_path)
         traceback.print_exc()
         if __debug__:
-            plt.show()
-        return False
+            debugutil.show()
+        return (False, p.search(os.path.split(image_path)[1]).group(1))
     else:
-        return True
+        return (True, p.search(os.path.split(image_path)[1]).group(1))
 
 
 if __name__ == '__main__':
@@ -536,7 +543,16 @@ if __name__ == '__main__':
             # for f in files:
             #    identify_and_output(f, outdir)
 
-            count = res.count(True)
+            count = 0
+            failed_array = []
+            for r in res:
+                success, id = r
+                if success:
+                    count += 1
+                else:
+                    failed_array.append(id)
+
             print(count, "/", len(res), "images sucessfully processed!")
+            print("The following IDs failed:", *failed_array)
         else:
             print("Path specified is not a valid file or directory:", path)

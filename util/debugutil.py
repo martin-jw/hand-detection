@@ -18,3 +18,10 @@ def create_debug_fig(img, title, cmap=None):
     ax.imshow(img, cmap=cmap)
 
     return ax
+
+def show():
+    global debug_fig, subplot_index
+    
+    plt.show()
+    debug_fig = None
+    subplot_index = 1
