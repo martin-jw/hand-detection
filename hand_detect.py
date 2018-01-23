@@ -24,6 +24,8 @@ import json
 from util import imgutil
 from util.imgutil import draw_data_points as ddp
 
+from util.debugutil import create_debug_fig
+
 import segmentation
 
 import multiprocessing
@@ -31,15 +33,6 @@ from multiprocessing import Pool
 from functools import partial
 
 io.use_plugin('matplotlib')
-
-
-def create_debug_fig(img, title, cmap=None):
-    fig = plt.figure()
-    plt.subplot(111)
-    plt.title(title)
-    plt.imshow(img, cmap=cmap)
-
-    return fig
 
 def find_palm_point(image):
     """Find the palm point in the given binary image using a distance map.
@@ -49,16 +42,15 @@ def find_palm_point(image):
     """
     miny = 50
     maxy = 250
-    minx = 75
-    maxx = 325
+    minx = 100
+    maxx = 300
 
-    dist_map = mp.distance_transform_edt(image[50:250, 100: 300])
+    dist_map = mp.distance_transform_edt(image[miny:maxy, minx:maxx])
 
     if __debug__:
         create_debug_fig(dist_map, "Distance Map", cmap='gray')
 
     max_index = np.argmax(dist_map)
-
     index = np.unravel_index(max_index, dist_map.shape)
 
     return [index[0] + miny, index[1] + minx], math.ceil(dist_map[index])
@@ -102,7 +94,7 @@ def create_palm_mask(image, palm_point, inner_radius, angle_step):
     inner_radius -- the radius of the largest possible circle inside the palm.
     angle_step -- how much the angle of each point should change.
     """
-    radius = inner_radius * 1.2
+    radius = inner_radius * 1.3
 
     angle_range = range(0, 360, angle_step)
 
@@ -113,6 +105,13 @@ def create_palm_mask(image, palm_point, inner_radius, angle_step):
     sample_points = sample_points[np.where(np.logical_and(np.logical_and(0 <= sample_y, sample_y < image.shape[0]), np.logical_and(0 <= sample_x, sample_x < image.shape[1])))]
 
     res = [get_nearest_border(image, p) for p in sample_points]
+
+    if __debug__:
+        img = color.gray2rgb(image.copy())
+        img[draw.circle_perimeter(int(palm_point[0]), int(palm_point[1]), int(radius), shape=img.shape)] = [0, 0, 1]
+        img = ddp(ddp(img, [0, 1, 0], 2, *res), [1, 0, 0], 2, palm_point)
+        create_debug_fig(img, "Palm Mask")
+        
     return res
 
 
@@ -261,6 +260,9 @@ def find_fingers(image, palm_point):
             if orientation < 0:
                 orientation += math.pi
 
+        if major_axis < 20:
+            continue
+
         dy = (math.sin(orientation) * 0.5 * major_axis)
         dx = (math.cos(orientation) * 0.5 * major_axis)
 
@@ -278,7 +280,8 @@ def find_fingers(image, palm_point):
                     'point': p,
                     'label': 'NO_DEF',
                     'tip': [p[0] - dy, p[1] + dx],
-                    'start': [p[0] + dy, p[1] - dx]
+                    'start': [p[0] + dy, p[1] - dx],
+                    'length': major_axis
                 }
                 finger_data.append(d)
         else:
@@ -289,6 +292,7 @@ def find_fingers(image, palm_point):
             data['label'] = "NO_DEF"
             data['tip'] = [point[0] - dy, point[1] + dx]
             data['start'] = [point[0] + dy, point[1] - dx]
+            data['length'] = major_axis
 
             if thumb:
                 finger_data.insert(0, data)
@@ -436,7 +440,7 @@ def identify_image(image_path, outdir):
     if __debug__:
         create_debug_fig(image, "Original Image")
 
-    binary = segmentation.create_bin_img_slic(image)
+    binary = segmentation.create_bin_img_threshold(image)
 
     if __debug__:
         create_debug_fig(binary, "Binary Image", cmap='gray')
@@ -455,15 +459,21 @@ def identify_binary_image(binary):
     wrist_points = find_wrist_points(palm_mask)
 
     if __debug__:
-        fig = create_debug_fig(ddp(ddp(binary, [0, 0, 1], 4, *palm_mask), [1, 0, 1], 4, *wrist_points), "Palm Mask", cmap='gray')
+        create_debug_fig(ddp(ddp(binary, [0, 0, 1], 2, *palm_mask), [1, 0, 1], 2, *wrist_points), "Wrist Points", cmap='gray')
 
     binary, palm_point, palm_mask, wrist_points = rotate_hand_upright(binary, palm_point, palm_mask, wrist_points)
     no_wrist_img = remove_wrist(binary, wrist_points)
 
     no_wrist_img, palm_point, palm_mask, wrist_points = crop_and_resize_image(no_wrist_img, palm_point, palm_mask, wrist_points)
 
+    if __debug__:
+        create_debug_fig(ddp(ddp(no_wrist_img, [0, 0, 1], 2, *palm_mask), [1, 0, 1], 2, *wrist_points, palm_point), "Rotated Image")
+
     no_palm_img = remove_palm(no_wrist_img, palm_mask)
     finger_data, has_thumb = find_fingers(no_palm_img, palm_point)
+
+    if __debug__:
+        create_debug_fig(no_palm_img, "No Palm Image", cmap='gray')
 
     palm_line = find_palm_line(no_wrist_img, wrist_points, finger_data, has_thumb)
 
@@ -473,6 +483,9 @@ def identify_binary_image(binary):
         del finger['region']
 
     drawing = draw_finished_image(no_wrist_img, finger_data, palm_point)
+
+    if __debug__:
+        create_debug_fig(drawing, "Finished Image")
 
     return drawing, finger_data, palm_point
 

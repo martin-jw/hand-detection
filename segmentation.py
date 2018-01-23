@@ -9,10 +9,13 @@ from skimage import morphology
 from skimage import exposure
 from skimage import measure
 from skimage import color
+from skimage import draw
 
 from scipy import ndimage as ndi
 
 import matplotlib.pyplot as plt
+
+from util.debugutil import create_debug_fig
 
 
 def create_bin_img_slic(image):
@@ -22,15 +25,15 @@ def create_bin_img_slic(image):
     labels1 = segmentation.slic(image, n_segments=500)
     g = future.graph.rag_mean_color(image, labels1)
 
+    labels2 = future.graph.cut_threshold(labels1, g, 0.07)
+
     if __debug__:
-        fig = plt.figure()
-        plt.subplot(111)
-        plt.title("SLIC Seg.")
-        plt.imshow(color.label2rgb(labels1, image))
+        create_debug_fig(color.label2rgb(labels2, image), "Threshold Cut")
 
+    # labels2 = future.graph.ncut(labels1, g)
 
-    labels2 = future.graph.cut_threshold(labels1, g, 0.060)
-    labels2 = future.graph.ncut(labels1, g)
+    # if __debug__:
+    #     create_debug_fig(color.label2rgb(labels2, image), "N Cut")
 
     bin_test = np.zeros((300, 400))
     for r in measure.regionprops(labels2):
@@ -44,33 +47,40 @@ def create_bin_img_slic(image):
 def create_bin_img_threshold(image):
 
     img = color.rgb2gray(image)
-    val = filters.threshold_local(img, 35)
+    val = filters.threshold_adaptive(img, 35)
     result = img > val
 
-    mask = create_bin_img_slic(img)
+    result = morphology.binary_opening(result, selem=morphology.disk(2))
+    labels = measure.label(result)
 
-    # Check if background was brighter than foreground, if so, invert the binary image.
-    labels = measure.label(result, background=2, connectivity=1)
-
-    regions = measure.regionprops(labels)
-    # Assume that background area > foreground area
-    mx_region = max(regions, key=lambda r: r.area)
-    regions.remove(mx_region)
-
-    for r in regions:
-        if r.area < 400:
-            rr, cc = zip(*r.coords)
+    for region in measure.regionprops(labels):
+        if region.area < 50:
+            rr, cc = zip(*region.coords)
             result[rr, cc] = 0
 
-    rr, cc = list(zip(*mx_region.coords))
-    if np.mean(result[rr, cc]) == 1:
-        result = np.invert(result)
+    result = morphology.binary_closing(result, selem=morphology.disk(2))
 
-    mask_invert = np.ones(mask.shape, dtype="bool")
-    mask_invert[np.where(mask)] = False
+    dist = ndi.distance_transform_edt(result)
+    maxima = feature.peak_local_max(dist)
 
-    result[np.where(mask_invert)] = 0
-    result = morphology.binary_closing(result, morphology.disk(5))
+    plt.figure()
+    plt.subplot(122)
+    plt.imshow(result, cmap='gray')
+    plt.plot(*reversed(list(zip(*maxima))), 'bo')
+
+    dist_invert = ndi.distance_transform_edt(np.invert(result))
+    minima = feature.peak_local_max(dist_invert)
+
+    plt.plot(*reversed(list(zip(*minima))), 'ro')
+
+    # for m in minima:
+    #     r = dist_invert[m[0], m[1]]
+    #     result[draw.circle(m[0], m[1], r, shape=result.shape)] = 1
+
+    plt.subplot(121)
+    plt.imshow(morphology.skeletonize(result), cmap='gray')
+    
+    plt.show()
 
     return result
 
