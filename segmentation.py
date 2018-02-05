@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 from util.debugutil import create_debug_fig
 
 
-def create_bin_img_slic(image):
+def create_bin_img_slic(image, segments=500, ):
 
     image = restoration.denoise_tv_chambolle(image, weight=0.05, multichannel=True)
 
@@ -29,11 +29,6 @@ def create_bin_img_slic(image):
 
     if __debug__:
         create_debug_fig(color.label2rgb(labels2, image), "Threshold Cut")
-
-    # labels2 = future.graph.ncut(labels1, g)
-
-    # if __debug__:
-    #     create_debug_fig(color.label2rgb(labels2, image), "N Cut")
 
     bin_test = np.zeros((300, 400))
     for r in measure.regionprops(labels2):

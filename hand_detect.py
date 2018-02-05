@@ -37,6 +37,7 @@ from functools import partial
 
 io.use_plugin('matplotlib')
 
+
 def find_palm_point(image):
     """Find the palm point in the given binary image using a distance map.
 
@@ -538,10 +539,9 @@ if __name__ == '__main__':
                 if os.path.isfile(os.path.join(path, f)):
                     files.append(os.path.join(path, f))
 
+            # Process multiple images at once using multiprocessing. Leave one core free.
             p = Pool(processes=(multiprocessing.cpu_count() - 1))
             res = p.map(partial(identify_and_output, outdir=outdir), files)
-            # for f in files:
-            #    identify_and_output(f, outdir)
 
             count = 0
             failed_array = []
