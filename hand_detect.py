@@ -20,6 +20,7 @@ from skimage import measure
 from skimage import draw
 from skimage import color
 from skimage import feature
+from skimage import morphology
 
 import json
 
@@ -48,8 +49,18 @@ def find_palm_point(image):
     maxy = 250
     minx = 100
     maxx = 300
+    height = maxy - miny
+    width = maxx - minx
 
-    dist_map = mp.distance_transform_edt(image[miny:maxy, minx:maxx])
+    img = image.copy()[miny:maxy, minx:maxx]
+
+    # Set border pixels to black
+    img[:1] = 0
+    img[height - 1:height] = 0
+    img[::, :1] = 0
+    img[::, width - 1:width] = 0
+
+    dist_map = mp.distance_transform_edt(img)
     maxima = feature.peak_local_max(dist_map)
 
     if __debug__:
@@ -58,7 +69,6 @@ def find_palm_point(image):
 
     max_index = np.argmax(dist_map)
     index = np.unravel_index(max_index, dist_map.shape)
-    print(index)
 
     return [index[0] + miny, index[1] + minx], math.ceil(dist_map[index])
 
@@ -101,6 +111,8 @@ def create_palm_mask(image, palm_point, inner_radius, angle_step):
     inner_radius -- the radius of the largest possible circle inside the palm.
     angle_step -- how much the angle of each point should change.
     """
+
+    img = image.copy()
     radius = inner_radius * 1.3
 
     angle_range = range(0, 360, angle_step)
@@ -109,16 +121,16 @@ def create_palm_mask(image, palm_point, inner_radius, angle_step):
     sample_y = np.array([math.floor(radius * math.sin(math.radians(a)) + palm_point[0]) for a in angle_range])
     sample_x = np.array([math.floor(radius * math.cos(math.radians(a)) + palm_point[1]) for a in angle_range])
     sample_points = np.array(list(zip(sample_y, sample_x)))
-    sample_points = sample_points[np.where(np.logical_and(np.logical_and(0 <= sample_y, sample_y < image.shape[0]), np.logical_and(0 <= sample_x, sample_x < image.shape[1])))]
+    sample_points = sample_points[np.where(np.logical_and(np.logical_and(0 <= sample_y, sample_y < img.shape[0]), np.logical_and(0 <= sample_x, sample_x < img.shape[1])))]
 
-    res = [get_nearest_border(image, p) for p in sample_points]
+    res = [get_nearest_border(img, p) for p in sample_points]
 
     if __debug__:
-        img = color.gray2rgb(image.copy())
-        img[draw.circle_perimeter(int(palm_point[0]), int(palm_point[1]), int(radius), shape=img.shape)] = [0, 0, 1]
-        img = ddp(ddp(img, [0, 1, 0], 2, *res), [1, 0, 0], 2, palm_point)
-        create_debug_fig(img, "Palm Mask")
-        
+        dbimg = color.gray2rgb(img.copy())
+        dbimg[draw.circle_perimeter(int(palm_point[0]), int(palm_point[1]), int(radius), shape=dbimg.shape)] = [0, 0, 1]
+        dbimg = ddp(ddp(dbimg, [0, 1, 0], 2, *res), [1, 0, 0], 2, palm_point)
+        create_debug_fig(dbimg, "Palm Mask", cmap="gray")
+
     return res
 
 
@@ -234,7 +246,7 @@ def find_fingers(image, palm_point):
 
     """
     regions = measure.label(image, background=0)
-    fingers = list(filter(lambda x: x.area > 30, measure.regionprops(regions)))
+    fingers = list(filter(lambda x: x.area > 200, measure.regionprops(regions)))
 
     finger_data = []
     has_thumb = False
@@ -254,7 +266,7 @@ def find_fingers(image, palm_point):
             orientation += math.pi
 
         ang = abs(math.degrees(math.atan2(palm_point[0] - point[0], palm_point[1] - point[1])))
-        if ang < 50:
+        if ang < 40:
             has_thumb = True
             thumb = True
 
@@ -273,8 +285,8 @@ def find_fingers(image, palm_point):
         dy = (math.sin(orientation) * 0.5 * major_axis)
         dx = (math.cos(orientation) * 0.5 * major_axis)
 
-        if math.floor(minor_axis / 25) > 1:
-            fingers = math.floor(minor_axis / 25)        
+        fingers = round(minor_axis / 23)
+        if fingers > 1:
             for x in range(0, fingers):
                 dist = (-1 * minor_axis / 2) + minor_axis / (2 * fingers) + x * minor_axis / fingers
 
@@ -447,7 +459,7 @@ def identify_image(image_path, outdir):
     if __debug__:
         create_debug_fig(image, "Original Image")
 
-    binary = segmentation.create_bin_img_slic(image)
+    binary = segmentation.create_bin_img_otsu(image)
 
     if __debug__:
         create_debug_fig(binary, "Binary Image", cmap='gray')
@@ -460,9 +472,14 @@ def identify_image(image_path, outdir):
 
 def identify_binary_image(binary):
 
-    palm_point, inner_radius = find_palm_point(binary)
+    closed_bin = skimage.img_as_float(morphology.binary_closing(binary, selem=morphology.disk(8)))
 
-    palm_mask = create_palm_mask(binary, palm_point, inner_radius, 5)
+    if __debug__:
+        create_debug_fig(closed_bin, "Closed Binary", cmap='gray')
+
+    palm_point, inner_radius = find_palm_point(closed_bin)
+
+    palm_mask = create_palm_mask(closed_bin, palm_point, inner_radius, 5)
     wrist_points = find_wrist_points(palm_mask)
 
     if __debug__:
@@ -482,7 +499,18 @@ def identify_binary_image(binary):
     if __debug__:
         create_debug_fig(no_palm_img, "No Palm Image", cmap='gray')
 
-    palm_line = find_palm_line(no_wrist_img, wrist_points, finger_data, has_thumb)
+    closed_no_wrist = skimage.img_as_float(morphology.binary_closing(no_wrist_img, selem=morphology.disk(8)))
+
+    if __debug__:
+        create_debug_fig(closed_no_wrist, "Closed No Wrist", cmap='gray')
+
+    palm_line = find_palm_line(closed_no_wrist, wrist_points, finger_data, has_thumb)
+
+    if __debug__:
+        create_debug_fig(closed_no_wrist, "Palm Line", cmap='gray')
+        x = np.arange(palm_line['start'], palm_line['end'], 1)
+        y = np.full((palm_line['end'] - palm_line['start']), palm_line['line'])
+        plt.plot(x, y)
 
     identify_fingers(finger_data, palm_line, has_thumb)
 
