@@ -19,14 +19,14 @@ import matplotlib.pyplot as plt
 from util.debugutil import create_debug_fig
 
 
-def create_bin_img_slic(image, segments=500, ):
+def create_bin_img_slic(image, segments=500, thresh=0.06):
 
-    image = restoration.denoise_tv_chambolle(image, weight=0.05, multichannel=True)
+    image = restoration.denoise_tv_chambolle(image, weight=0.04, multichannel=True)
 
-    labels1 = segmentation.slic(image, n_segments=500)
+    labels1 = segmentation.slic(image, n_segments=segments)
     g = future.graph.rag_mean_color(image, labels1)
 
-    labels2 = future.graph.cut_threshold(labels1, g, 0.06)
+    labels2 = future.graph.cut_threshold(labels1, g, thresh)
 
     if __debug__:
         create_debug_fig(color.label2rgb(labels2, image), "Threshold Cut")

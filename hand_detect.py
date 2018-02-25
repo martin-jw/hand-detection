@@ -113,7 +113,7 @@ def create_palm_mask(image, palm_point, inner_radius, angle_step):
     """
 
     img = image.copy()
-    radius = inner_radius * 1.3
+    radius = inner_radius * 1.4
 
     angle_range = range(0, 360, angle_step)
 
@@ -246,7 +246,7 @@ def find_fingers(image, palm_point):
 
     """
     regions = measure.label(image, background=0)
-    fingers = list(filter(lambda x: x.area > 200, measure.regionprops(regions)))
+    fingers = list(filter(lambda x: x.area > 150, measure.regionprops(regions)))
 
     finger_data = []
     has_thumb = False
@@ -285,7 +285,7 @@ def find_fingers(image, palm_point):
         dy = (math.sin(orientation) * 0.5 * major_axis)
         dx = (math.cos(orientation) * 0.5 * major_axis)
 
-        fingers = round(minor_axis / 23)
+        fingers = round(minor_axis / 25)
         if fingers > 1:
             for x in range(0, fingers):
                 dist = (-1 * minor_axis / 2) + minor_axis / (2 * fingers) + x * minor_axis / fingers
