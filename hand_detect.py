@@ -265,7 +265,8 @@ def find_fingers(image, palm_point):
         if orientation < 0:
             orientation += math.pi
 
-        ang = abs(math.degrees(math.atan2(palm_point[0] - point[0], palm_point[1] - point[1])))
+        ang = abs(math.degrees(math.atan((palm_point[0] - point[0]) / (palm_point[1] - point[1]))))
+        print('y: %0.3f x: %0.3f angle: %0.3f' % (palm_point[0] - point[0], palm_point[1] - point[1], ang))
         if ang < 40:
             has_thumb = True
             thumb = True
@@ -279,6 +280,7 @@ def find_fingers(image, palm_point):
             if orientation < 0:
                 orientation += math.pi
 
+        print(major_axis)
         if major_axis < 20:
             continue
 
