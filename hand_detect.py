@@ -461,7 +461,7 @@ def identify_image(image_path, outdir):
     if __debug__:
         create_debug_fig(image, "Original Image")
 
-    binary = segmentation.create_bin_img_otsu(image)
+    binary = segmentation.create_bin_img_slic(image, thresh=0.09)
 
     if __debug__:
         create_debug_fig(binary, "Binary Image", cmap='gray')
@@ -474,7 +474,8 @@ def identify_image(image_path, outdir):
 
 def identify_binary_image(binary):
 
-    closed_bin = skimage.img_as_float(morphology.binary_closing(binary, selem=morphology.disk(8)))
+    # closed_bin = skimage.img_as_float(morphology.binary_closing(binary, selem=morphology.disk(8)))
+    closed_bin = binary
 
     if __debug__:
         create_debug_fig(closed_bin, "Closed Binary", cmap='gray')
@@ -501,7 +502,8 @@ def identify_binary_image(binary):
     if __debug__:
         create_debug_fig(no_palm_img, "No Palm Image", cmap='gray')
 
-    closed_no_wrist = skimage.img_as_float(morphology.binary_closing(no_wrist_img, selem=morphology.disk(8)))
+    # closed_no_wrist = skimage.img_as_float(morphology.binary_closing(no_wrist_img, selem=morphology.disk(8)))
+    closed_no_wrist = no_wrist_img
 
     if __debug__:
         create_debug_fig(closed_no_wrist, "Closed No Wrist", cmap='gray')
