@@ -11,6 +11,7 @@ from skimage import exposure
 from skimage import measure
 from skimage import color
 from skimage import draw
+from skimage.filters import rank
 
 from scipy import ndimage as ndi
 
@@ -49,3 +50,46 @@ def create_bin_img_otsu(image):
     img = skimage.img_as_float(img)
 
     return img
+
+def create_bin_img_watershed(image):
+
+    img = color.rgb2gray(image)
+    denoised = rank.median(img, morphology.disk(1))
+
+    markers = rank.gradient(denoised, morphology.disk(4)) < 20
+    markers = ndi.label(markers)[0]
+
+    gradient = rank.gradient(denoised, morphology.disk(2))
+
+    labels = morphology.watershed(gradient, markers)
+
+    # fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(8,8), sharex=True, sharey=True, subplot_kw={'adjustable':'box-forced'})
+    # ax = axes.ravel()
+
+    # ax[0].imshow(denoised, cmap='gray', interpolation='nearest')
+    # ax[0].set_title('Denoised')
+
+    # ax[1].imshow(gradient, cmap='spectral', interpolation='nearest')
+    # ax[1].set_title('Local Gradient')
+
+    # ax[2].imshow(markers, cmap='spectral', interpolation='nearest')
+    # ax[2].set_title('markers')
+
+    # ax[3].imshow(img, cmap='gray', interpolation='nearest')
+    # ax[3].imshow(labels, cmap='spectral', interpolation='nearest', alpha=.7)
+    # ax[3].set_title("Segmented")
+
+    # for a in ax:
+    #     a.axis('off')
+
+    # fig.tight_layout()
+    # plt.show()
+
+    binary = np.zeros((labels.shape[0], labels.shape[1]), dtype='float64')
+
+    for r in measure.regionprops(labels):
+        if r.label != 1:
+            rr, cc = zip(*r.coords)
+            binary[rr, cc] = 1
+
+    return binary
