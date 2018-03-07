@@ -377,13 +377,18 @@ def find_palm_line(image, wrist_points, finger_data, has_thumb):
     return result
 
 
-def identify_fingers(finger_data, palm_line, has_thumb):
+def identify_fingers(finger_data, palm_point, palm_line, has_thumb):
     """
 
     """
+
+    right_hand = False
+
     for idx, finger in enumerate(finger_data):
         if idx == 0 and has_thumb:
             finger['label'] = 'thumb'
+            if finger['point'][1] > palm_point[1]:
+                right_hand = True
             continue
 
         x = finger['point'][1]
@@ -392,13 +397,13 @@ def identify_fingers(finger_data, palm_line, has_thumb):
         start = palm_line['start']
 
         if x < start + interval:
-            finger['label'] = 'index'
+            finger['label'] = 'pinky' if right_hand else 'index' 
         elif x < start + 2 * interval:
-            finger['label'] = 'middle'
+            finger['label'] = 'ring' if right_hand else 'middle'
         elif x < start + 3 * interval:
-            finger['label'] = 'ring'
+            finger['label'] = 'middle' if right_hand else 'ring'
         else:
-            finger['label'] = 'pinky'
+            finger['label'] = 'index' if right_hand else 'pinky'
 
     return
 
@@ -461,7 +466,7 @@ def identify_image(image_path, outdir):
     if __debug__:
         create_debug_fig(image, "Original Image")
 
-    binary = segmentation.create_bin_img_watershed(image)
+    binary = segmentation.create_bin_img_otsu(image)
 
     if __debug__:
         create_debug_fig(binary, "Binary Image", cmap='gray')
@@ -474,8 +479,8 @@ def identify_image(image_path, outdir):
 
 def identify_binary_image(binary):
 
-    # closed_bin = skimage.img_as_float(morphology.binary_closing(binary, selem=morphology.disk(8)))
-    closed_bin = binary
+    closed_bin = skimage.img_as_float(morphology.binary_closing(binary, selem=morphology.disk(8)))
+    # closed_bin = binary
 
     if __debug__:
         create_debug_fig(closed_bin, "Closed Binary", cmap='gray')
@@ -502,8 +507,8 @@ def identify_binary_image(binary):
     if __debug__:
         create_debug_fig(no_palm_img, "No Palm Image", cmap='gray')
 
-    # closed_no_wrist = skimage.img_as_float(morphology.binary_closing(no_wrist_img, selem=morphology.disk(8)))
-    closed_no_wrist = no_wrist_img
+    closed_no_wrist = skimage.img_as_float(morphology.binary_closing(no_wrist_img, selem=morphology.disk(8)))
+    # closed_no_wrist = no_wrist_img
 
     if __debug__:
         create_debug_fig(closed_no_wrist, "Closed No Wrist", cmap='gray')
@@ -516,7 +521,7 @@ def identify_binary_image(binary):
         y = np.full((palm_line['end'] - palm_line['start']), palm_line['line'])
         plt.plot(x, y)
 
-    identify_fingers(finger_data, palm_line, has_thumb)
+    identify_fingers(finger_data, palm_point, palm_line, has_thumb)
 
     for finger in finger_data:
         del finger['region']
