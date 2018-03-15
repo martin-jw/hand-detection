@@ -46,9 +46,6 @@ def create_bin_img_otsu(image):
 
     val = filters.threshold_otsu(image)
     img = image.copy() >= val
-
-    img = skimage.img_as_float(img)
-
     labels = measure.label(img, background=2)
 
     mx_region = max(measure.regionprops(labels), key=lambda r: r.area)
@@ -57,6 +54,7 @@ def create_bin_img_otsu(image):
     if np.mean(img[rr, cc]) == 1:
         img = np.invert(img)
 
+    img = skimage.img_as_float(img)
     return img, True
 
 

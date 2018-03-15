@@ -475,6 +475,7 @@ def identify_image(create_bin_func, image_path):
     drawing, finger_data, palm_point = identify_binary_image(binary, closed)
     print("Sucessfully processed:", os.path.split(image_path)[1])
 
+    del image
     return drawing, finger_data, palm_point
 
 
