@@ -36,6 +36,9 @@ import multiprocessing
 from multiprocessing import Pool
 from functools import partial
 
+import warnings
+warnings.filterwarnings("ignore")
+
 io.use_plugin('matplotlib')
 
 
@@ -266,7 +269,6 @@ def find_fingers(image, palm_point):
             orientation += math.pi
 
         ang = abs(math.degrees(math.atan((palm_point[0] - point[0]) / (palm_point[1] - point[1]))))
-        print('y: %0.3f x: %0.3f angle: %0.3f' % (palm_point[0] - point[0], palm_point[1] - point[1], ang))
         if ang < 40:
             has_thumb = True
             thumb = True
@@ -280,7 +282,6 @@ def find_fingers(image, palm_point):
             if orientation < 0:
                 orientation += math.pi
 
-        print(major_axis)
         if major_axis < 20:
             continue
 
@@ -455,7 +456,7 @@ def draw_finished_image(image, finger_data, palm_point):
     return canvas
 
 
-def identify_image(image_path, outdir):
+def identify_image(create_bin_func, image_path):
 
     name = os.path.split(image_path)[1]
     print("Processing image:", image_path)
@@ -466,21 +467,22 @@ def identify_image(image_path, outdir):
     if __debug__:
         create_debug_fig(image, "Original Image")
 
-    binary = segmentation.create_bin_img_otsu(image)
+    binary, closed = create_bin_func(image)
 
     if __debug__:
         create_debug_fig(binary, "Binary Image", cmap='gray')
 
-    drawing, finger_data, palm_point = identify_binary_image(binary)
+    drawing, finger_data, palm_point = identify_binary_image(binary, closed)
     print("Sucessfully processed:", os.path.split(image_path)[1])
 
     return drawing, finger_data, palm_point
 
 
-def identify_binary_image(binary):
+def identify_binary_image(binary, closed):
 
-    closed_bin = skimage.img_as_float(morphology.binary_closing(binary, selem=morphology.disk(8)))
-    # closed_bin = binary
+    closed_bin = binary
+    if closed:
+        closed_bin = skimage.img_as_float(morphology.binary_closing(binary, selem=morphology.disk(8)))
 
     if __debug__:
         create_debug_fig(closed_bin, "Closed Binary", cmap='gray')
@@ -507,8 +509,10 @@ def identify_binary_image(binary):
     if __debug__:
         create_debug_fig(no_palm_img, "No Palm Image", cmap='gray')
 
-    closed_no_wrist = skimage.img_as_float(morphology.binary_closing(no_wrist_img, selem=morphology.disk(8)))
-    # closed_no_wrist = no_wrist_img
+    closed_no_wrist = no_wrist_img
+
+    if closed:
+        closed_no_wrist = skimage.img_as_float(morphology.binary_closing(no_wrist_img, selem=morphology.disk(8)))
 
     if __debug__:
         create_debug_fig(closed_no_wrist, "Closed No Wrist", cmap='gray')
@@ -537,7 +541,7 @@ def identify_binary_image(binary):
 def identify_and_output(image_path, outdir):
     p = re.compile("id(\d+)")
     try:
-        image, finger_data, palm_point = identify_image(image_path, outdir)
+        image, finger_data, palm_point = identify_image(segmentation.create_bin_img_watershed, image_path)
         write_data(finger_data, palm_point, os.path.splitext(os.path.split(image_path)[1])[0] + '_data.json', outdir)
         io.imsave(os.path.join(outdir, os.path.splitext(os.path.split(image_path)[1])[0] + '_image.jpg'), image)
         if __debug__:

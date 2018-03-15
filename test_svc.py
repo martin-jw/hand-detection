@@ -48,7 +48,7 @@ if __name__ == '__main__':
 		print(X.shape)
 		print(y.shape)
 
-		X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33)
+		X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.40)
 
 		classifier = svc.create_classifier(X_train, y_train)
 

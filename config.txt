@@ -1,0 +1,8 @@
+0-19: five
+20-39: four
+40-59: three
+60-79: two
+80-99: one
+100-119: rock
+120-139: spock
+140-159: rock-thumb

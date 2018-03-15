@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 from util.debugutil import create_debug_fig
 
 
-def create_bin_img_slic(image, segments=500, thresh=0.06):
+def create_bin_img_slic(image, segments=500, thresh=0.1):
 
     image = restoration.denoise_tv_chambolle(image, weight=0.04, multichannel=True)
 
@@ -37,7 +37,7 @@ def create_bin_img_slic(image, segments=500, thresh=0.06):
         rr, cc = zip(*r.coords)
         bin_test[rr, cc] = 1
 
-    return bin_test
+    return bin_test, False
 
 
 def create_bin_img_otsu(image):
@@ -49,7 +49,7 @@ def create_bin_img_otsu(image):
 
     img = skimage.img_as_float(img)
 
-    return img
+    return img, True
 
 def create_bin_img_watershed(image):
 
@@ -62,29 +62,6 @@ def create_bin_img_watershed(image):
     gradient = rank.gradient(denoised, morphology.disk(2))
 
     labels = morphology.watershed(gradient, markers)
-
-    # fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(8,8), sharex=True, sharey=True, subplot_kw={'adjustable':'box-forced'})
-    # ax = axes.ravel()
-
-    # ax[0].imshow(denoised, cmap='gray', interpolation='nearest')
-    # ax[0].set_title('Denoised')
-
-    # ax[1].imshow(gradient, cmap='spectral', interpolation='nearest')
-    # ax[1].set_title('Local Gradient')
-
-    # ax[2].imshow(markers, cmap='spectral', interpolation='nearest')
-    # ax[2].set_title('markers')
-
-    # ax[3].imshow(img, cmap='gray', interpolation='nearest')
-    # ax[3].imshow(labels, cmap='spectral', interpolation='nearest', alpha=.7)
-    # ax[3].set_title("Segmented")
-
-    # for a in ax:
-    #     a.axis('off')
-
-    # fig.tight_layout()
-    # plt.show()
-
     binary = np.zeros((labels.shape[0], labels.shape[1]), dtype='float64')
 
     for r in measure.regionprops(labels):
@@ -92,4 +69,4 @@ def create_bin_img_watershed(image):
             rr, cc = zip(*r.coords)
             binary[rr, cc] = 1
 
-    return binary
+    return binary, False
