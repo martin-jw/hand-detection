@@ -542,7 +542,7 @@ def identify_binary_image(binary, closed):
 def identify_and_output(image_path, outdir):
     p = re.compile("id(\d+)")
     try:
-        image, finger_data, palm_point = identify_image(segmentation.create_bin_img_watershed, image_path)
+        image, finger_data, palm_point = identify_image(segmentation.create_bin_img_slic, image_path)
         write_data(finger_data, palm_point, os.path.splitext(os.path.split(image_path)[1])[0] + '_data.json', outdir)
         io.imsave(os.path.join(outdir, os.path.splitext(os.path.split(image_path)[1])[0] + '_image.jpg'), image)
         if __debug__:

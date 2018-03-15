@@ -48,7 +48,7 @@ def run_image(image_path, seg_method):
 
 
 def test_image(image_path, config, classifier):
-    d = ['-', '-', '-', '-', '-']
+    d = ['-', '-', '-', '-', '-', '-']
     path, name = os.path.split(image_path)
     match = re.search('id(\d+)', name)
     if match is not None:
@@ -71,14 +71,22 @@ def test_image(image_path, config, classifier):
             d[3] = classifier.predict([slic])[0]
         except Exception as e:
             d[3] = 'FAILED'
-            print('SLIC failed!')
+            print('SLIC t=0.1 failed!')
+            traceback.print_exc()
+
+        try:
+            slic = run_image(image_path, partial(seg.create_bin_img_slic, thresh=0.045))
+            d[4] = classifier.predict([slic])[0]
+        except Exception as e:
+            d[4] = 'FAILED'
+            print('SLIC t=0.045 failed!')
             traceback.print_exc()
 
         try:
             ws = run_image(image_path, seg.create_bin_img_watershed)
-            d[4] = classifier.predict([ws])[0]
+            d[5] = classifier.predict([ws])[0]
         except Exception as e:
-            d[4] = 'FAILED'
+            d[5] = 'FAILED'
             print('Watershed failed!')
             traceback.print_exc()
 
