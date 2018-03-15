@@ -49,7 +49,16 @@ def create_bin_img_otsu(image):
 
     img = skimage.img_as_float(img)
 
+    labels = measure.label(img, background=2)
+
+    mx_region = max(measure.regionprops(labels), key=lambda r: r.area)
+
+    rr, cc = list(zip(*mx_region.coords))
+    if np.mean(img[rr, cc]) == 1:
+        img = np.invert(img)
+
     return img, True
+
 
 def create_bin_img_watershed(image):
 
