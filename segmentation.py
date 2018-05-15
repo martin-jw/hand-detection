@@ -21,13 +21,34 @@ from util.debugutil import create_debug_fig
 
 
 def create_bin_img_slic(image, segments=500, thresh=0.1):
+    """A background segmentation algorithm. Segments the image using Simple Linear Iterative Clustering and a graph cut. One
+    region is chosen as the background and the rest is chosen as foreground.
+
+    Keyword arguments:
+    image -- The image to segment.
+    segments -- The number of segments SLIC should segment into. Default is 500.
+    thresh -- The threshold for the graph cut. Default is 0.1."""
 
     image = restoration.denoise_tv_chambolle(image, weight=0.04, multichannel=True)
 
     labels1 = segmentation.slic(image, n_segments=segments)
     g = future.graph.rag_mean_color(image, labels1)
 
+    fig, axes = plt.subplots(ncols=2, figsize=(8, 8))
+    ax = axes.ravel()
+
     labels2 = future.graph.cut_threshold(labels1, g, thresh)
+
+    ax[0].imshow(color.label2rgb(labels1, image))
+    ax[0].set_title("SLIC Clustering")
+
+    ax[1].imshow(color.label2rgb(labels2, image))
+    ax[1].set_title("Graph Cut")
+
+    for a in ax:
+        a.axis('off')
+
+    fig.tight_layout()
 
     if __debug__:
         create_debug_fig(color.label2rgb(labels2, image), "Threshold Cut")
@@ -75,5 +96,26 @@ def create_bin_img_watershed(image):
         if r.label != 1:
             rr, cc = zip(*r.coords)
             binary[rr, cc] = 1
+
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(8,8), sharex=True, sharey=True, subplot_kw={'adjustable':'box-forced'})
+    ax = axes.ravel()
+
+    ax[0].imshow(denoised, cmap='gray', interpolation='nearest')
+    ax[0].set_title('Denoised')
+
+    ax[1].imshow(gradient, cmap='spectral', interpolation='nearest')
+    ax[1].set_title('Local Gradient')
+
+    ax[2].imshow(markers, cmap='spectral', interpolation='nearest')
+    ax[2].set_title('markers')
+
+    ax[3].imshow(img, cmap='gray', interpolation='nearest')
+    ax[3].imshow(labels, cmap='spectral', interpolation='nearest', alpha=.7)
+    ax[3].set_title("Segmented")
+
+    for a in ax:
+        a.axis('off')
+
+    fig.tight_layout()
 
     return binary, False

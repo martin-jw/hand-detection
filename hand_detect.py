@@ -68,7 +68,7 @@ def find_palm_point(image):
 
     if __debug__:
         create_debug_fig(dist_map, "Distance Map", cmap='gray')
-        plt.plot(*reversed(list(zip(*maxima))), 'r+')
+        # plt.plot(*reversed(list(zip(*maxima))), 'r+')
 
     max_index = np.argmax(dist_map)
     index = np.unravel_index(max_index, dist_map.shape)
@@ -82,6 +82,9 @@ def get_nearest_border(image, point):
     Keyword arguments:
     image -- binary image.
     point -- the point to get closest point to.
+
+    Returns:
+    The closest background point as a [y, x] array.
     """
     radius = 1
     angle = 0
@@ -213,8 +216,13 @@ def remove_wrist(image, wrist_points):
 
 
 def crop_and_resize_image(image, palm_point, palm_mask, wrist_points):
-    """
-
+    """Crops the image to the detected palm region and then resizes it to a 200x200 image.
+    
+    Keyword arguments:
+    image -- the binary image to transform.
+    palm_point -- the palm point.
+    palm_mask -- the palm mask.
+    wrist_points -- the points of the wrist.
     """
     regions = measure.label(image, background=0)
 
@@ -245,8 +253,12 @@ def remove_palm(image, palm_mask):
 
 
 def find_fingers(image, palm_point):
-    """
+    """Finds fingers by labeling binary regions in the given image, filtering out smaller regions. It then
+    measures the detected regions to calculate finger length and orientation.
 
+    Keyword arguments:
+    image -- binary image to find fingers in.
+    palm_point -- the palm point.
     """
     regions = measure.label(image, background=0)
     fingers = list(filter(lambda x: x.area > 150, measure.regionprops(regions)))
@@ -273,6 +285,7 @@ def find_fingers(image, palm_point):
             has_thumb = True
             thumb = True
 
+        # selects the minor and major axis to make sure that the major axis always is along the finger.
         minor_axis = finger.minor_axis_length
         major_axis = finger.major_axis_length
         if not thumb and (math.degrees(orientation) < 30 or math.degrees(orientation) > 150):
@@ -288,6 +301,7 @@ def find_fingers(image, palm_point):
         dy = (math.sin(orientation) * 0.5 * major_axis)
         dx = (math.cos(orientation) * 0.5 * major_axis)
 
+        # segment the region into multiple fingers if the region is too wide.
         fingers = round(minor_axis / 25)
         if fingers > 1:
             for x in range(0, fingers):
@@ -325,8 +339,11 @@ def find_fingers(image, palm_point):
 
 
 def get_nearest_finger(pos, finger_data):
-    """
-
+    """Gets the finger in the finger data closest to the given point.
+    
+    Keyword arguments:
+    pos -- The point to measure distance from.
+    finger_data -- an array of finger data.
     """
     def distance(p):
 
@@ -339,8 +356,14 @@ def get_nearest_finger(pos, finger_data):
 
 
 def find_palm_line(image, wrist_points, finger_data, has_thumb):
-    """
+    """Finds the palm line in the image based on the given data. The palm line is highest possible horizontal 
+    line that does not cross, any space between two fingers with the exception of a thumb.
 
+    Keyword arguments:
+    image -- The binary image to find the palm line on.
+    wrist_points -- the points of the wrist.
+    finger_data -- an array of finger data.
+    has_thumb -- wether or not the first object in the finger_data array should be considered a thumb or not.
     """
     pline = -1
     line = int(wrist_points[1][0])
@@ -379,8 +402,15 @@ def find_palm_line(image, wrist_points, finger_data, has_thumb):
 
 
 def identify_fingers(finger_data, palm_point, palm_line, has_thumb):
-    """
+    """Identifies and labels the detect fingers based on their vertical alignment to the palm line.
+    Splits the palm line into 4 equal parts and labels the fingers based on which part of the palm line
+    the centroid of the finger aligns with vertically.
 
+    Keyword arguments:
+    finger_data -- An array of finger data with the fingers to label.
+    palm_point -- The palm point.
+    palm_line -- The data for the palm line.
+    has_thumb -- Wether or not the image has a thumb.
     """
 
     right_hand = False
@@ -410,6 +440,14 @@ def identify_fingers(finger_data, palm_point, palm_line, has_thumb):
 
 
 def write_data(finger_data, palm_point, file_name, directory=''):
+    """Writes the finger data and palm point with JSON format to a file with the given file name in the given directory.
+
+    Keyword arguments:
+    finger_data -- The finger data to write.
+    palm_point -- The palm point of the hand.
+    file_name -- The file name to write to.
+    directory -- The directory to prepend to the filename, default is ''.
+    """
 
     data = {}
     data['fingers'] = finger_data
@@ -420,6 +458,14 @@ def write_data(finger_data, palm_point, file_name, directory=''):
 
 
 def draw_finished_image(image, finger_data, palm_point):
+    """Returns a color copy of the given binary image with finger data and palm point drawn to it.
+
+    Keyword arguments:
+    image -- binary image to draw on.
+    finger_data -- the finger data to draw.
+    palm_point -- the palm point.
+    """
+
     canvas = skimage.color.gray2rgb(image.copy())
 
     colors = {
@@ -457,6 +503,18 @@ def draw_finished_image(image, finger_data, palm_point):
 
 
 def identify_image(create_bin_func, image_path):
+    """Runs the given background segmentation function and passes the result to identify_binary_image and returns the result.
+
+    Keyword argument:
+    create_bin_func -- The function to run for background segmentation.
+    image_path -- The path to the image to identify.
+
+    Returns:
+    A tuple with the following elements:
+    [0] -- an image with the finalized finger identification visualized.
+    [1] -- the detected finger data.
+    [2] -- the palm point.
+    """
 
     name = os.path.split(image_path)[1]
     print("Processing image:", image_path)
@@ -480,6 +538,12 @@ def identify_image(create_bin_func, image_path):
 
 
 def identify_binary_image(binary, closed):
+    """Runs the finger detection algorithm on the given binary image and returns the result.
+
+    Keyword arguments:
+    binary -- the binary image to analyze.
+    closed -- a closed version of the binary image, depending on the background segmentation algorithm.
+    """
 
     closed_bin = binary
     if closed:
@@ -540,9 +604,16 @@ def identify_binary_image(binary, closed):
 
 
 def identify_and_output(image_path, outdir):
+    """Identifies the given image and writes the result to the given output directory.
+
+    Keyword arguments:
+    image_path -- Path to the image to idnetify.
+    outdir -- The directory to write the result to.
+    """
+
     p = re.compile("id(\d+)")
     try:
-        image, finger_data, palm_point = identify_image(segmentation.create_bin_img_slic, image_path)
+        image, finger_data, palm_point = identify_image(segmentation.create_bin_img_otsu, image_path)
         write_data(finger_data, palm_point, os.path.splitext(os.path.split(image_path)[1])[0] + '_data.json', outdir)
         io.imsave(os.path.join(outdir, os.path.splitext(os.path.split(image_path)[1])[0] + '_image.jpg'), image)
         if __debug__:
@@ -581,7 +652,7 @@ if __name__ == '__main__':
                 if os.path.isfile(os.path.join(path, f)):
                     files.append(os.path.join(path, f))
 
-            # Process multiple images at once using multiprocessing. Leave one core free.
+            # Process multiple images at once using multiprocessing. Leave one core free to not lock the PC.
             p = Pool(processes=(multiprocessing.cpu_count() - 1))
             res = p.map(partial(identify_and_output, outdir=outdir), files)
 
