@@ -90,6 +90,10 @@ def create_window():
     window.title("Hand detection")
     window.configure(background='black')
 
+    window.overrideredirect(True)
+    window.geometry("{0}x{1}+0+0".format(window.winfo_screenwidth(), window.winfo_screenheight()))
+    window.bind("<Escape>", lambda e: window.destroy())
+
     canvas = PhotoCanvas(window, width=w, height=h, highlightthickness=0)
     canvas.pack()
 
