@@ -73,6 +73,9 @@ def find_palm_point(image):
     max_index = np.argmax(dist_map)
     index = np.unravel_index(max_index, dist_map.shape)
 
+    if dist_map[index] == 0:
+        raise Exception("Incompatible binary image!")
+
     return [index[0] + miny, index[1] + minx], math.ceil(dist_map[index])
 
 
@@ -217,7 +220,7 @@ def remove_wrist(image, wrist_points):
 
 def crop_and_resize_image(image, palm_point, palm_mask, wrist_points):
     """Crops the image to the detected palm region and then resizes it to a 200x200 image.
-    
+
     Keyword arguments:
     image -- the binary image to transform.
     palm_point -- the palm point.
@@ -340,7 +343,7 @@ def find_fingers(image, palm_point):
 
 def get_nearest_finger(pos, finger_data):
     """Gets the finger in the finger data closest to the given point.
-    
+
     Keyword arguments:
     pos -- The point to measure distance from.
     finger_data -- an array of finger data.
@@ -542,7 +545,7 @@ def identify_binary_image(binary, closed):
 
     Keyword arguments:
     binary -- the binary image to analyze.
-    closed -- a closed version of the binary image, depending on the background segmentation algorithm.
+    closed -- a boolean weather or not a closed version of the binary image should be used
     """
 
     closed_bin = binary
